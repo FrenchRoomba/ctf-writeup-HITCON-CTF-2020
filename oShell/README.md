@@ -160,7 +160,7 @@ We got stuck here for a while thinking about ways to get a packet onto the syste
 * Traceroute responses with payloads
 * DNS tricks to send back a response payload
 
-Eventually we realised that, while the system itself doesn't allow us to send it incoming packets due to it being a container without a dedicated IP, it does recieve `ping` packets from the internet. This gives us a chance to specify a payload in a response instead. To help us test this we used a script one of our team members had prepared earlier, called [https://github.com/fincham/nfqueue-break-tls-handshake/blob/master/tls_hello_modify.py](TLSFuc^WTLS Hello Modify).
+Eventually we realised that, while the system itself doesn't allow us to send it incoming packets due to it being a container without a dedicated IP, it does recieve `ping` packets from the internet. This gives us a chance to specify a payload in a response instead. To help us test this we used a script one of our team members had prepared earlier, called [TLSFuc^WTLS Hello Modify](https://github.com/fincham/nfqueue-break-tls-handshake/blob/master/tls_hello_modify.py).
 
 We modified this script to inject an arbitrary payload into an ICMP response prepared by the kernel with the following lines:
 ```py
@@ -175,7 +175,8 @@ Putting this all together, we are able to run our `tcpdump` command and write ou
 ### Break Out Part 2 - Shell City
 Now we can concerntrate on getting a shell. One option is to use the `post-rotate` command feature in `tcpdump`, but we investigated this and found an alternative that worked a little better: `top`.
 
-The `top` command will read out its configuration from a `.toprc`. This allows us to specify arbitrary commands, through the "Inspect" function. This is discussed in [https://gtfobins.github.io/gtfobins/top/](top GTFOBins) page.
+The `top` command will read out its configuration from a `.toprc`. This allows us to specify arbitrary commands, through the "Inspect" function. This is discussed in [top GTFOBins](https://gtfobins.github.io/gtfobins/top/) page.
+
 To begin, we need the path to the `.toprc` file, which we can get by launching `top` and pressing <kbd>w</kbd>:
 ```
  Wrote configuration to '/home/oShell//.toprc'
