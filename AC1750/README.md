@@ -12,14 +12,14 @@ We were given a pcap file of the traffic between a router (192.168.0.1) and an a
 
 ![dir_list](dir_list.png)
 
-Searching about the challenge name we came across this article https://www.thezdi.com/blog/2020/4/6/exploiting-the-tp-link-archer-c7-at-pwn2own-tokyo that detailed a command injection vulnerability in this specific router (TP-Link Archer A7). The post also specified that the UDP packets are encrypted in AES-CBC with a static key and IV. Also, we also know from the blog post that it's only using half the key (128-bit), we have the following key and IV.
+Searching about the challenge name we came across this article https://www.thezdi.com/blog/2020/4/6/exploiting-the-tp-link-archer-c7-at-pwn2own-tokyo that detailed a command injection vulnerability in this specific router (TP-Link Archer A7). The post also specified that the UDP packets are encrypted in AES-CBC with a static key and IV. Also, we also know from the blog post that it's only using half the key (128-bit), thus we have the following key and IV.
 
 ```
 key: TPONEMESH_Kf!xn?
 IV: 1234567890abcdef
 ```
 
-Since we were only give the pcap file, this indicated that the flag must be in it. Therefore, we proceed to decrypting the UDP packets in the traffic dump. Despite the gibberish at the beginning, we can still see some valid strings. More specifically, we can see the attribute to `slave_mac` contained some commands, in this case `;echo >f;`.
+Since we were only given the pcap file, this indicated that the flag must be in it. Therefore, we proceed to decrypting the UDP packets in the traffic dump. Despite the gibberish at the beginning, we can still see some valid strings. More specifically, we can see the attribute to `slave_mac` contained some commands, in this case `;echo >f;`.
 
 ![udp_decrypt](udp_decrypt.png)
 
